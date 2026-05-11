@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-y(xsc+m-9gro6&j_%efd=swmd%3ni#i#&wmne5ag-mtr#f%@ke
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -37,8 +37,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'home',
     'cart',
+    
 ]
 CART_SESSION_ID = 'cart'
 
@@ -66,7 +68,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'cart.context_processor.cart_total_amount',
+                'cart.context_processors.cart_total_amount',
             ],
         },
     },
@@ -150,3 +152,4 @@ EMAIL_HOST_PASSWORD = 'password'
 MEDIA_ROOT = os.path.join('media')
 
 MEDIA_URL = '/media/'
+

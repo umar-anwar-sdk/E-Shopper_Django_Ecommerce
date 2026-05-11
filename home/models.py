@@ -35,7 +35,7 @@ class Product(models.Model):
     Category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, default=True)
     sub_category = models.ForeignKey(Sub_Category, on_delete=models.CASCADE, null=True, default=True)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, default=True)
-    image = models.ImageField(upload_to='images/')
+    image = models.ImageField(upload_to='images/', blank=True, null=True)
     name = models.CharField(max_length=100)
     details = models.TextField(null=True)
     price = models.IntegerField()
@@ -88,7 +88,7 @@ class Contact_us(models.Model):
 
 
 class Order(models.Model):
-    image = models.ImageField(upload_to='order/image')
+    image = models.ImageField(upload_to='order/image', blank=True, null=True)
     product = models.CharField(max_length=1000, default='')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     quantity = models.CharField(max_length=5)
@@ -105,8 +105,8 @@ class Order(models.Model):
 
 
 class Slider(models.Model):
-    image = models.ImageField(upload_to='images/')
-    price_img = models.ImageField(upload_to='images/',null=True)
+    image = models.ImageField(upload_to='images/', blank=True, null=True)
+    price_img = models.ImageField(upload_to='images/', blank=True, null=True)
     title = models.CharField(max_length=255)
     sub_title = models.CharField(max_length=255)
     description = models.TextField(null=True)

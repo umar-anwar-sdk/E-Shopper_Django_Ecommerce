@@ -1,14 +1,255 @@
 from django.contrib.auth.models import User
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
-
-from home.models import Category, Product, UserCreateForm, Contact_us, Order, Brand, Slider
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from home.models import Category, Product, Order, Brand, Slider, Contact_us, UserCreateForm
+
 from cart.cart import Cart
 
-from django.contrib.auth import authenticate, login, logout
+from .serializers import CategorySerializer, ProductSerializer, BrandSerializer, OrderSerializer
 
 
+
+
+
+@api_view(['GET'])
+def product_api(request):
+    products = Product.objects.all()
+    serializer = ProductSerializer(products, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def product_detail_api(request, id):
+    product = Product.objects.get(id=id)
+    serializer = ProductSerializer(product)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def category_api(request):
+    categories = Category.objects.all()
+    serializer = CategorySerializer(categories, many=True)
+    return Response(serializer.data)
+@api_view(['GET'])
+def brand_api(request):
+    brands = Brand.objects.all()
+    serializer = BrandSerializer(brands, many=True)
+    return Response(serializer.data)
+
+
+
+
+from django.shortcuts import get_object_or_404
+
+@api_view(['POST'])
+def add_to_cart(request):
+
+    product_id = request.data.get('product_id')
+
+    product = get_object_or_404(Product, id=product_id)
+
+    cart = request.session.get('cart', {})
+
+    product_id = str(product_id)
+
+    if product_id in cart:
+        cart[product_id]['quantity'] += 1
+    else:
+        cart[product_id] = {
+            "name": product.name,
+            "price": product.price,
+            "quantity": 1
+        }
+
+    request.session['cart'] = cart
+    request.session.modified = True
+
+    return Response({"message": "Product added to cart", "cart": cart})
+@api_view(['GET'])
+def view_cart(request):
+    cart = request.session.get('cart', {})
+    return Response(cart)
+@api_view(['POST'])
+def remove_from_cart(request):
+    product_id = request.data['product_id']
+
+    cart = request.session.get('cart', {})
+
+    if product_id in cart:
+        del cart[product_id]
+
+    request.session['cart'] = cart
+
+    return Response({"message": "Removed"})
+
+@api_view(['POST'])
+def place_order(request):
+
+    from django.contrib.auth.models import User
+
+    user = User.objects.first()
+
+    cart = request.session.get('cart', {})
+
+    for item in cart.values():
+
+        Order.objects.create(
+            user=user,
+            product=item['name'],
+            price=item['price'],
+            quantity=item['quantity'],
+        )
+
+    request.session['cart'] = {}
+
+    return Response({"message": "Order placed"})
+@api_view(['GET'])
+def my_orders(request):
+    from django.contrib.auth.models import User
+
+    user = User.objects.first()
+
+    orders = Order.objects.filter(user=user)
+
+    serializer = OrderSerializer(orders, many=True)
+
+    return Response(serializer.data)
+@api_view(['PATCH'])  # or ['PUT']
+def update_product(request, id):
+    product = Product.objects.get(id=id)
+    serializer = ProductSerializer(product, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors)
+@api_view(['DELETE'])
+def delete_product(request, id):
+
+    product = Product.objects.get(id=id)
+    product.delete()
+
+    return Response({"message": "Product deleted"})
+@api_view(['POST'])
+def create_product(request):
+
+    serializer = ProductSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors)
+
+@api_view(['GET'])
+def search_product(request):
+
+    keyword = request.GET.get('keyword', '')
+
+    products = Product.objects.filter(
+        Q(name__icontains=keyword) |
+        Q(brand__name__icontains=keyword)
+    )
+
+    serializer = ProductSerializer(products, many=True)
+
+    return Response(serializer.data)
+@api_view(['GET'])
+def category_products(request, id):
+
+    products = Product.objects.filter(Category=id)
+
+    serializer = ProductSerializer(products, many=True)
+
+    return Response(serializer.data)
+@api_view(['GET'])
+def brand_products(request, id):
+
+    products = Product.objects.filter(brand=id)
+
+    serializer = ProductSerializer(products, many=True)
+
+    return Response(serializer.data)
+@api_view(['GET'])
+def cart_total(request):
+
+    cart = request.session.get('cart', {})
+
+    total = 0
+
+    for item in cart.values():
+
+        total += item['price'] * item['quantity']
+
+    return Response({"total": total})
+
+@api_view(['POST'])
+def increment_cart(request):
+
+    product_id = request.data.get('product_id')
+
+    if not product_id:
+        return Response({"error": "product_id is required"}, status=400)
+
+    cart = request.session.get('cart', {})
+
+    product_id = str(product_id)
+
+    if product_id in cart:
+        cart[product_id]['quantity'] += 1
+        message = "Quantity increased"
+    else:
+        return Response({"error": "Product not in cart"}, status=404)
+
+    request.session['cart'] = cart
+    request.session.modified = True
+
+    return Response({"message": message, "cart": cart})
+@api_view(['POST'])
+def decrement_cart(request):
+
+    product_id = request.data.get('product_id')
+
+    if not product_id:
+        return Response({"error": "product_id is required"}, status=400)
+
+    cart = request.session.get('cart', {})
+    product_id = str(product_id)
+
+    if product_id not in cart:
+        return Response({"error": "Product not in cart"}, status=404)
+
+    cart[product_id]['quantity'] -= 1
+
+    if cart[product_id]['quantity'] <= 0:
+        del cart[product_id]
+
+    request.session['cart'] = cart
+    request.session.modified = True
+
+    return Response({
+        "message": "Quantity decreased",
+        "cart": cart
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_orders(request):
+
+    user = request.user
+
+    orders = Order.objects.filter(user=user)
+
+    serializer = OrderSerializer(orders, many=True)
+
+    return Response(serializer.data)
 
 def home_page(request):
     category = Category.objects.all()
@@ -167,9 +408,9 @@ def Product_page(request):
     }
     return render(request, 'product.html', context)
 
+def product_detail(request, id):
+    product = Product.objects.get(id=id)
 
-def product_detail(request):
-    product = Product.objects.filter(id=id).frist()
     context = {
         'product': product,
     }
