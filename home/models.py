@@ -2,8 +2,11 @@ import datetime
 
 from django.db import models
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.conf import settings
 from django import forms
+
+User = get_user_model()
 
 
 class Category(models.Model):
@@ -35,6 +38,7 @@ class Product(models.Model):
     Category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, default=True)
     sub_category = models.ForeignKey(Sub_Category, on_delete=models.CASCADE, null=True, default=True)
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, default=True)
+    vendor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='products')
     image = models.ImageField(upload_to='images/', blank=True, null=True)
     name = models.CharField(max_length=100)
     details = models.TextField(null=True)

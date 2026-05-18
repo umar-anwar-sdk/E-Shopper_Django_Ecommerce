@@ -1,19 +1,29 @@
-from django.contrib.auth.models import User
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.contrib.auth import get_user_model
+from django.conf import settings
+from rest_framework import generics, permissions, status, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-
-from rest_framework.decorators import api_view
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from authentication.permissions import (
+    IsAdminUserRole,
+    IsVendorUserRole,
+    IsCustomerUserRole,
+    IsAdminOrVendor,
+    IsOwnerOrAdmin,
+    IsVendorProductOwner,
+)
 from home.models import Category, Product, Order, Brand, Slider, Contact_us, UserCreateForm
 
 from cart.cart import Cart
 
 from .serializers import CategorySerializer, ProductSerializer, BrandSerializer, OrderSerializer
+
+User = get_user_model()
 
 
 
@@ -238,6 +248,110 @@ def decrement_cart(request):
         "message": "Quantity decreased",
         "cart": cart
     })
+
+
+class ProductListCreateAPIView(generics.ListCreateAPIView):
+    """List products for everyone and allow admins/vendors to create products."""
+    queryset = Product.objects.select_related('brand', 'Category', 'vendor').all()
+    serializer_class = ProductSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsAdminOrVendor()]
+
+    def perform_create(self, serializer):
+        if self.request.user.is_vendor():
+            serializer.save(vendor=self.request.user)
+            return
+
+        if self.request.user.is_admin():
+            vendor_id = self.request.data.get('vendor') or self.request.data.get('vendor_id')
+            if vendor_id:
+                try:
+                    vendor = User.objects.get(id=vendor_id, role='vendor')
+                    serializer.save(vendor=vendor)
+                    return
+                except User.DoesNotExist:
+                    raise serializers.ValidationError({'vendor': 'Vendor not found.'})
+            serializer.save(vendor=self.request.user)
+            return
+
+        raise permissions.PermissionDenied('You do not have permission to add products.')
+
+
+class ProductRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve a product for anyone and allow owners/admins to update or delete."""
+    queryset = Product.objects.select_related('brand', 'Category', 'vendor').all()
+    serializer_class = ProductSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsVendorProductOwner()]
+
+    def perform_update(self, serializer):
+        if self.request.user.is_vendor() and serializer.instance.vendor != self.request.user:
+            raise permissions.PermissionDenied('You may only update your own products.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if self.request.user.is_vendor() and instance.vendor != self.request.user:
+            raise permissions.PermissionDenied('You may only delete your own products.')
+        instance.delete()
+
+
+class VendorProductListAPIView(generics.ListAPIView):
+    """List products that belong to the current vendor."""
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+
+    def get_queryset(self):
+        return Product.objects.filter(vendor=self.request.user).select_related('brand', 'Category')
+
+
+class AdminProductListAPIView(generics.ListAPIView):
+    """Admin view of all products."""
+    queryset = Product.objects.all().select_related('brand', 'Category', 'vendor')
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+
+
+class VendorBrandUpdateAPIView(generics.UpdateAPIView):
+    """Allow a vendor to update branding and banner assets."""
+    serializer_class = None
+    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+
+    def get_serializer_class(self):
+        from authentication.serializers import UpdateProfileSerializer
+        return UpdateProfileSerializer
+
+    def get_object(self):
+        return self.request.user
+
+    def put(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+
+class VendorDashboardAPIView(generics.RetrieveAPIView):
+    """Vendor dashboard with product counts and ownership stats."""
+    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+
+    def get(self, request, *args, **kwargs):
+        total_products = Product.objects.filter(vendor=request.user).count()
+        total_brands = Brand.objects.filter(product__vendor=request.user).distinct().count()
+        return Response({
+            'vendor_id': request.user.id,
+            'vendor_email': request.user.email,
+            'shop_name': request.user.shop_name,
+            'total_products': total_products,
+            'total_brands': total_brands,
+            'active': True,
+        })
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
