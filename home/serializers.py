@@ -1,12 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Category, Order, Product, Brand
+from .models import Brand, Category, Order, Product
 
 User = get_user_model()
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = serializers.StringRelatedField(read_only=True)
+    category = serializers.StringRelatedField(source='Category', read_only=True)
     brand = serializers.StringRelatedField(read_only=True)
     vendor = serializers.StringRelatedField(read_only=True)
     vendor_id = serializers.PrimaryKeyRelatedField(
@@ -38,39 +38,25 @@ class ProductSerializer(serializers.ModelSerializer):
             'date', 'image', 'Category', 'category', 'category_id',
             'brand', 'brand_id', 'vendor', 'vendor_id'
         ]
+        read_only_fields = ['id', 'date', 'category', 'brand', 'vendor']
 
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = '__all__'
+        fields = ['id', 'name']
+        read_only_fields = ['id']
 
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = '__all__'
+        fields = ['id', 'name']
+        read_only_fields = ['id']
 
 
 class OrderSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Order
-        fields = '__all__'
-
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = '__all__'
-        from .models import Brand
-
-class BrandSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Brand
-        fields = '__all__'
-
-class OrderSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Order
-        fields = '__all__'
+        fields = ['id', 'product', 'user', 'quantity', 'price', 'address', 'phone', 'pincode', 'total', 'image', 'date']
+        read_only_fields = ['id', 'user', 'total', 'date']

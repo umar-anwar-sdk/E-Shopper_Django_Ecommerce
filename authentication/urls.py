@@ -12,6 +12,7 @@ from .views import (
     UserDetailAPIView,
     DeleteUserAPIView,
     VendorListAPIView,
+    VendorApprovalAPIView,
     AdminDashboardStatsAPIView,
     VendorProfileAPIView,
     CustomerProfileAPIView,
@@ -43,5 +44,6 @@ urlpatterns = [
     path('admin/users/<int:user_id>/', UserDetailAPIView.as_view(), name='user-detail'),
     path('admin/users/<int:user_id>/delete/', DeleteUserAPIView.as_view(), name='delete-user'),
     path('admin/vendors/', VendorListAPIView.as_view(), name='vendor-list'),
+    path('admin/vendors/<int:vendor_id>/approval/', VendorApprovalAPIView.as_view(), name='vendor-approval'),
     path('admin/stats/', AdminDashboardStatsAPIView.as_view(), name='admin-stats'),
 ]

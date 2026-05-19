@@ -1,61 +1,73 @@
 from rest_framework import permissions
 
+from .constants import ROLES
+
+
+def has_user_role(user, role_name):
+    """Return whether the user has the requested role."""
+    if not user or not user.is_authenticated:
+        return False
+
+    role_accessor = getattr(user, f'is_{role_name}', None)
+    if not callable(role_accessor):
+        return False
+
+    return bool(role_accessor())
+
+
+def has_any_role(user, role_names):
+    """Return whether the user has any of the requested roles."""
+    return any(has_user_role(user, role_name) for role_name in role_names)
+
+
+def is_vendor_approved(user):
+    """Vendor accounts must be approved before accessing protected resources."""
+    return has_user_role(user, ROLES['vendor']) and getattr(user, 'is_verified', False)
+
 
 class IsAdminUserRole(permissions.BasePermission):
-    """
-    Permission for admin users only.
-    """
+    """Permission for admin users only."""
     message = 'Admin access required.'
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_admin())
+        return has_user_role(request.user, ROLES['admin'])
 
 
 class IsVendorUserRole(permissions.BasePermission):
-    """
-    Permission for vendor users only.
-    """
+    """Permission for approved vendor users only."""
     message = 'Vendor access required.'
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_vendor())
+        return is_vendor_approved(request.user)
 
 
 class IsCustomerUserRole(permissions.BasePermission):
-    """
-    Permission for customer users only.
-    """
+    """Permission for customer users only."""
     message = 'Customer access required.'
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_customer())
+        return has_user_role(request.user, ROLES['customer'])
 
 
 class IsAdminOrVendor(permissions.BasePermission):
-    """
-    Permission for admin or vendor users.
-    """
+    """Permission for admin or approved vendor users."""
     message = 'Vendor or Admin access required.'
 
     def has_permission(self, request, view):
-        return bool(
-            request.user and
-            request.user.is_authenticated and
-            (request.user.is_admin() or request.user.is_vendor())
-        )
+        if has_user_role(request.user, ROLES['admin']):
+            return True
+        return is_vendor_approved(request.user)
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
-    """
-    Object-level permission to allow owners or admins full access.
-    """
+    """Object-level permission allowing resource owners or admins full access."""
     message = 'You do not have permission to access this resource.'
 
     def has_object_permission(self, request, view, obj):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if request.user.is_admin():
+        if has_user_role(request.user, ROLES['admin']):
             return True
 
         owner = getattr(obj, 'vendor', None) or getattr(obj, 'user', None)
@@ -63,18 +75,16 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 
 
 class IsVendorProductOwner(permissions.BasePermission):
-    """
-    Object-level permission to allow vendors to manage their own products, or admins to manage any.
-    """
+    """Permission for admins or approved vendors managing their own products."""
     message = 'You can only manage your own products.'
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and (request.user.is_admin() or request.user.is_vendor()))
+        return has_any_role(request.user, [ROLES['admin'], ROLES['vendor']])
 
     def has_object_permission(self, request, view, obj):
-        if request.user.is_admin():
+        if has_user_role(request.user, ROLES['admin']):
             return True
-        return bool(request.user.is_vendor() and getattr(obj, 'vendor', None) == request.user)
+        return is_vendor_approved(request.user) and getattr(obj, 'vendor', None) == request.user
 
 
 class IsAdmin(IsAdminUserRole):

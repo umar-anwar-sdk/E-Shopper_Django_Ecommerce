@@ -1,0 +1,23 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Vendor Dashboard - E-Shopper{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="rounded-3xl bg-white p-6 shadow-sm">
+    <h1 class="text-2xl font-semibold text-slate-900">Welcome, {{ vendor_name }}</h1>
+    <p class="mt-2 text-sm text-slate-500">This is your vendor dashboard where you can review product performance and sales data.</p>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="rounded-3xl bg-white p-6 shadow-sm">
+      <p class="text-sm font-semibold text-slate-500">Your Products</p>
+      <p class="mt-4 text-3xl font-semibold text-slate-900">{{ product_count }}</p>
+    </div>
+    <div class="rounded-3xl bg-white p-6 shadow-sm">
+      <p class="text-sm font-semibold text-slate-500">Total Sales Entries</p>
+      <p class="mt-4 text-3xl font-semibold text-slate-900">{{ total_sales }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

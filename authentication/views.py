@@ -304,6 +304,37 @@ class VendorListAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class VendorApprovalAPIView(APIView):
+    """
+    API for admin to approve or reject vendor accounts.
+    PATCH /api/auth/admin/vendors/{vendor_id}/approval/
+    """
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, vendor_id):
+        try:
+            vendor = CustomUser.objects.get(id=vendor_id, role='vendor')
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'Vendor not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        approval = request.data.get('approved')
+        if approval is None:
+            return Response(
+                {'error': 'Please provide approved=true or approved=false.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        approved = str(approval).lower() in ['true', '1', 'yes', 'approved']
+        vendor.is_verified = approved
+        vendor.save(update_fields=['is_verified'])
+
+        status_text = 'approved' if vendor.is_verified else 'rejected'
+        return Response({
+            'message': f'Vendor successfully {status_text}.',
+            'vendor': UserSerializer(vendor).data
+        }, status=status.HTTP_200_OK)
+
+
 class AdminDashboardStatsAPIView(APIView):
     """
     API for admin dashboard statistics

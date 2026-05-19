@@ -1,14 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, get_user_model
 from django.db.models import Q
-from django.contrib.auth import get_user_model
 from django.conf import settings
 from rest_framework import generics, permissions, status, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from authentication.decorators import admin_required, vendor_required
 from authentication.permissions import (
     IsAdminUserRole,
     IsVendorUserRole,
@@ -18,241 +18,242 @@ from authentication.permissions import (
     IsVendorProductOwner,
 )
 from home.models import Category, Product, Order, Brand, Slider, Contact_us, UserCreateForm
-
 from cart.cart import Cart
-
 from .serializers import CategorySerializer, ProductSerializer, BrandSerializer, OrderSerializer
 
 User = get_user_model()
 
 
+# ----------------------------- API Helpers -----------------------------
+
+def _get_product(product_id):
+    try:
+        return Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return None
 
 
+def _serialize_errors(serializer):
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ----------------------------- API Views -----------------------------
 
 @api_view(['GET'])
 def product_api(request):
-    products = Product.objects.all()
+    products = Product.objects.select_related('brand', 'Category', 'vendor').all()
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data)
 
+
 @api_view(['GET'])
 def product_detail_api(request, id):
-    product = Product.objects.get(id=id)
+    product = _get_product(id)
+    if not product:
+        return Response({'error': 'Product not found.'}, status=status.HTTP_404_NOT_FOUND)
     serializer = ProductSerializer(product)
     return Response(serializer.data)
 
-@api_view(['GET'])
-def category_api(request):
-    categories = Category.objects.all()
-    serializer = CategorySerializer(categories, many=True)
-    return Response(serializer.data)
-@api_view(['GET'])
-def brand_api(request):
-    brands = Brand.objects.all()
-    serializer = BrandSerializer(brands, many=True)
-    return Response(serializer.data)
-
-
-
-
-from django.shortcuts import get_object_or_404
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def add_to_cart(request):
-
     product_id = request.data.get('product_id')
+    product = _get_product(product_id)
+    if not product:
+        return Response({'error': 'Invalid product id'}, status=status.HTTP_404_NOT_FOUND)
 
-    product = get_object_or_404(Product, id=product_id)
-
-    cart = request.session.get('cart', {})
-
-    product_id = str(product_id)
+    cart = request.session.get(settings.CART_SESSION_ID, {})
+    product_id = str(product.id)
 
     if product_id in cart:
         cart[product_id]['quantity'] += 1
     else:
         cart[product_id] = {
-            "name": product.name,
-            "price": product.price,
-            "quantity": 1
+            'name': product.name,
+            'price': product.price,
+            'quantity': 1,
+            'image': product.image.url if product.image else ''
         }
 
-    request.session['cart'] = cart
+    request.session[settings.CART_SESSION_ID] = cart
     request.session.modified = True
 
-    return Response({"message": "Product added to cart", "cart": cart})
-@api_view(['GET'])
-def view_cart(request):
-    cart = request.session.get('cart', {})
-    return Response(cart)
-@api_view(['POST'])
-def remove_from_cart(request):
-    product_id = request.data['product_id']
+    return Response({'message': 'Product added to cart', 'cart': cart})
 
-    cart = request.session.get('cart', {})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def view_cart(request):
+    cart = request.session.get(settings.CART_SESSION_ID, {})
+    return Response(cart)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_from_cart(request):
+    product_id = str(request.data.get('product_id'))
+    cart = request.session.get(settings.CART_SESSION_ID, {})
 
     if product_id in cart:
         del cart[product_id]
+        request.session[settings.CART_SESSION_ID] = cart
 
-    request.session['cart'] = cart
+    return Response({'message': 'Removed', 'cart': cart})
 
-    return Response({"message": "Removed"})
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def place_order(request):
-
-    from django.contrib.auth.models import User
-
-    user = User.objects.first()
-
-    cart = request.session.get('cart', {})
+    cart = request.session.get(settings.CART_SESSION_ID, {})
+    if not cart:
+        return Response({'error': 'Cart is empty.'}, status=status.HTTP_400_BAD_REQUEST)
 
     for item in cart.values():
-
+        total = item['price'] * item['quantity']
         Order.objects.create(
-            user=user,
+            user=request.user,
             product=item['name'],
             price=item['price'],
             quantity=item['quantity'],
+            image=item.get('image', ''),
+            address=request.data.get('address', ''),
+            phone=request.data.get('phone', ''),
+            pincode=request.data.get('pincode', ''),
+            total=total,
         )
 
-    request.session['cart'] = {}
+    request.session[settings.CART_SESSION_ID] = {}
+    request.session.modified = True
 
-    return Response({"message": "Order placed"})
+    return Response({'message': 'Order placed successfully.'})
+
+
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def my_orders(request):
-    from django.contrib.auth.models import User
-
-    user = User.objects.first()
-
-    orders = Order.objects.filter(user=user)
-
+    orders = Order.objects.filter(user=request.user)
     serializer = OrderSerializer(orders, many=True)
-
     return Response(serializer.data)
-@api_view(['PATCH'])  # or ['PUT']
-def update_product(request, id):
-    product = Product.objects.get(id=id)
-    serializer = ProductSerializer(product, data=request.data, partial=True)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_product(request, id):
+    product = _get_product(id)
+    if not product:
+        return Response({'error': 'Product not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.user.is_vendor() and product.vendor != request.user:
+        return Response({'error': 'You may only update your own products.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ProductSerializer(product, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
+    return _serialize_errors(serializer)
 
-    return Response(serializer.errors)
+
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_product(request, id):
+    product = _get_product(id)
+    if not product:
+        return Response({'error': 'Product not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    product = Product.objects.get(id=id)
+    if request.user.is_vendor() and product.vendor != request.user:
+        return Response({'error': 'You may only delete your own products.'}, status=status.HTTP_403_FORBIDDEN)
+
     product.delete()
+    return Response({'message': 'Product deleted'})
 
-    return Response({"message": "Product deleted"})
+
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_product(request):
+    if not (request.user.is_vendor() or request.user.is_admin()):
+        return Response({'error': 'You do not have permission to add products.'}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = ProductSerializer(data=request.data)
-
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
+        if request.user.is_vendor():
+            serializer.save(vendor=request.user)
+        else:
+            serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return _serialize_errors(serializer)
 
-    return Response(serializer.errors)
 
 @api_view(['GET'])
 def search_product(request):
-
     keyword = request.GET.get('keyword', '')
-
     products = Product.objects.filter(
         Q(name__icontains=keyword) |
-        Q(brand__name__icontains=keyword)
-    )
-
+        Q(details__icontains=keyword) |
+        Q(brand__name__icontains=keyword) |
+        Q(Category__name__icontains=keyword)
+    ).distinct()
     serializer = ProductSerializer(products, many=True)
-
     return Response(serializer.data)
+
+
 @api_view(['GET'])
 def category_products(request, id):
-
     products = Product.objects.filter(Category=id)
-
     serializer = ProductSerializer(products, many=True)
-
     return Response(serializer.data)
+
+
 @api_view(['GET'])
 def brand_products(request, id):
-
     products = Product.objects.filter(brand=id)
-
     serializer = ProductSerializer(products, many=True)
-
     return Response(serializer.data)
+
+
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def cart_total(request):
+    cart = request.session.get(settings.CART_SESSION_ID, {})
+    total = sum(item['price'] * item['quantity'] for item in cart.values())
+    return Response({'total': total})
 
-    cart = request.session.get('cart', {})
-
-    total = 0
-
-    for item in cart.values():
-
-        total += item['price'] * item['quantity']
-
-    return Response({"total": total})
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def increment_cart(request):
-
-    product_id = request.data.get('product_id')
-
-    if not product_id:
-        return Response({"error": "product_id is required"}, status=400)
-
-    cart = request.session.get('cart', {})
-
-    product_id = str(product_id)
-
-    if product_id in cart:
-        cart[product_id]['quantity'] += 1
-        message = "Quantity increased"
-    else:
-        return Response({"error": "Product not in cart"}, status=404)
-
-    request.session['cart'] = cart
-    request.session.modified = True
-
-    return Response({"message": message, "cart": cart})
-@api_view(['POST'])
-def decrement_cart(request):
-
-    product_id = request.data.get('product_id')
-
-    if not product_id:
-        return Response({"error": "product_id is required"}, status=400)
-
-    cart = request.session.get('cart', {})
-    product_id = str(product_id)
+    product_id = str(request.data.get('product_id'))
+    cart = request.session.get(settings.CART_SESSION_ID, {})
 
     if product_id not in cart:
-        return Response({"error": "Product not in cart"}, status=404)
+        return Response({'error': 'Product not in cart'}, status=status.HTTP_404_NOT_FOUND)
+
+    cart[product_id]['quantity'] += 1
+    request.session[settings.CART_SESSION_ID] = cart
+    request.session.modified = True
+    return Response({'message': 'Quantity increased', 'cart': cart})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def decrement_cart(request):
+    product_id = str(request.data.get('product_id'))
+    cart = request.session.get(settings.CART_SESSION_ID, {})
+
+    if product_id not in cart:
+        return Response({'error': 'Product not in cart'}, status=status.HTTP_404_NOT_FOUND)
 
     cart[product_id]['quantity'] -= 1
-
     if cart[product_id]['quantity'] <= 0:
         del cart[product_id]
-
-    request.session['cart'] = cart
+    request.session[settings.CART_SESSION_ID] = cart
     request.session.modified = True
-
-    return Response({
-        "message": "Quantity decreased",
-        "cart": cart
-    })
+    return Response({'message': 'Quantity decreased', 'cart': cart})
 
 
 class ProductListCreateAPIView(generics.ListCreateAPIView):
     """List products for everyone and allow admins/vendors to create products."""
-    queryset = Product.objects.select_related('brand', 'Category', 'vendor').all()
+    queryset = Product.objects.select_related('brand', 'Category', 'vendor').order_by('-id').all()
     serializer_class = ProductSerializer
 
     def get_permissions(self):
@@ -266,15 +267,8 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
             return
 
         if self.request.user.is_admin():
-            vendor_id = self.request.data.get('vendor') or self.request.data.get('vendor_id')
-            if vendor_id:
-                try:
-                    vendor = User.objects.get(id=vendor_id, role='vendor')
-                    serializer.save(vendor=vendor)
-                    return
-                except User.DoesNotExist:
-                    raise serializers.ValidationError({'vendor': 'Vendor not found.'})
-            serializer.save(vendor=self.request.user)
+            vendor = serializer.validated_data.get('vendor')
+            serializer.save(vendor=vendor or self.request.user)
             return
 
         raise permissions.PermissionDenied('You do not have permission to add products.')
@@ -304,7 +298,7 @@ class ProductRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView)
 class VendorProductListAPIView(generics.ListAPIView):
     """List products that belong to the current vendor."""
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+    permission_classes = [IsAuthenticated, IsVendorUserRole]
 
     def get_queryset(self):
         return Product.objects.filter(vendor=self.request.user).select_related('brand', 'Category')
@@ -312,14 +306,13 @@ class VendorProductListAPIView(generics.ListAPIView):
 
 class AdminProductListAPIView(generics.ListAPIView):
     """Admin view of all products."""
-    queryset = Product.objects.all().select_related('brand', 'Category', 'vendor')
+    queryset = Product.objects.select_related('brand', 'Category', 'vendor').all()
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
 
 
 class VendorBrandUpdateAPIView(generics.UpdateAPIView):
     """Allow a vendor to update branding and banner assets."""
-    serializer_class = None
     permission_classes = [IsAuthenticated(), IsVendorUserRole]
 
     def get_serializer_class(self):
@@ -336,9 +329,66 @@ class VendorBrandUpdateAPIView(generics.UpdateAPIView):
         return self.partial_update(request, *args, **kwargs)
 
 
+class CategoryListCreateAPIView(generics.ListCreateAPIView):
+    """List categories for everyone and allow admin to create categories."""
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsAdminUserRole()]
+
+
+class CategoryRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """Allow admin users to manage a category."""
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+
+
+class BrandListCreateAPIView(generics.ListCreateAPIView):
+    """List brands for everyone and allow admin to create brands."""
+    queryset = Brand.objects.all()
+    serializer_class = BrandSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsAdminUserRole()]
+
+
+class BrandRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """Allow admin users to manage a brand."""
+    queryset = Brand.objects.all()
+    serializer_class = BrandSerializer
+    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+
+
+class OrderListCreateAPIView(generics.ListCreateAPIView):
+    """List orders for current user and allow customers to place orders."""
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_admin():
+            return Order.objects.all().select_related('user')
+        return Order.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class OrderRetrieveAPIView(generics.RetrieveAPIView):
+    """Retrieve a single order for owner or admin."""
+    queryset = Order.objects.select_related('user').all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+
+
 class VendorDashboardAPIView(generics.RetrieveAPIView):
     """Vendor dashboard with product counts and ownership stats."""
-    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+    permission_classes = [IsAuthenticated, IsVendorUserRole]
 
     def get(self, request, *args, **kwargs):
         total_products = Product.objects.filter(vendor=request.user).count()
@@ -353,17 +403,52 @@ class VendorDashboardAPIView(generics.RetrieveAPIView):
         })
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def my_orders(request):
+# ----------------------------- Template Views -----------------------------
 
-    user = request.user
+@admin_required
+def admin_dashboard(request):
+    total_customers = User.objects.filter(role='customer').count()
+    total_vendors = User.objects.filter(role='vendor').count()
+    pending_vendors = User.objects.filter(role='vendor', is_verified=False).count()
+    total_products = Product.objects.count()
+    total_orders = Order.objects.count()
+    vendors = User.objects.filter(role='vendor').order_by('-created_at')
 
-    orders = Order.objects.filter(user=user)
+    context = {
+        'total_customers': total_customers,
+        'total_vendors': total_vendors,
+        'pending_vendors': pending_vendors,
+        'total_products': total_products,
+        'total_orders': total_orders,
+        'vendors': vendors,
+    }
+    return render(request, 'dashboard/admin/dashboard.html', context)
 
-    serializer = OrderSerializer(orders, many=True)
 
-    return Response(serializer.data)
+@admin_required
+def vendor_approval(request, vendor_id):
+    vendor = get_object_or_404(User, id=vendor_id, role='vendor')
+
+    if request.method == 'POST':
+        approved = request.POST.get('approved') == 'true'
+        vendor.is_verified = approved
+        vendor.save(update_fields=['is_verified'])
+        return redirect('admin_dashboard')
+
+    return render(request, 'dashboard/admin/vendor_approval.html', {'vendor': vendor})
+
+
+@vendor_required
+def vendor_dashboard_page(request):
+    product_count = Product.objects.filter(vendor=request.user).count()
+    total_sales = Order.objects.filter(product__icontains=request.user.shop_name).count()
+    context = {
+        'product_count': product_count,
+        'total_sales': total_sales,
+        'vendor_name': request.user.shop_name,
+    }
+    return render(request, 'dashboard/vendor/dashboard.html', context)
+
 
 def home_page(request):
     category = Category.objects.all()
@@ -383,7 +468,7 @@ def home_page(request):
         'product': product,
         'slider': slider,
     }
-    return render(request, "index.html", context)
+    return render(request, 'index.html', context)
 
 
 def signup(request):
@@ -399,109 +484,96 @@ def signup(request):
             return redirect('home_page')
     else:
         form = UserCreateForm()
-    context = {
-        'form': form,
-    }
-    return render(request, "registration/signup.html", context)
+
+    return render(request, 'registration/signup.html', {'form': form})
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def cart_add(request, id):
     cart = Cart(request)
-    product = Product.objects.get(id=id)
+    product = get_object_or_404(Product, id=id)
     cart.add(product=product)
-    return redirect("home_page")
+    return redirect('home_page')
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def item_clear(request, id):
     cart = Cart(request)
-    product = Product.objects.get(id=id)
+    product = get_object_or_404(Product, id=id)
     cart.remove(product)
-    return redirect("cart_detail")
+    return redirect('cart_detail')
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def item_increment(request, id):
     cart = Cart(request)
-    product = Product.objects.get(id=id)
+    product = get_object_or_404(Product, id=id)
     cart.add(product=product)
-    return redirect("cart_detail")
+    return redirect('cart_detail')
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def item_decrement(request, id):
     cart = Cart(request)
-    product = Product.objects.get(id=id)
+    product = get_object_or_404(Product, id=id)
     cart.decrement(product=product)
-    return redirect("cart_detail")
+    return redirect('cart_detail')
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def cart_clear(request):
     cart = Cart(request)
     cart.clear()
-    return redirect("cart_detail")
+    return redirect('cart_detail')
 
 
-@login_required(login_url="/accounts/login/")
+@login_required(login_url='/accounts/login/')
 def cart_detail(request):
     return render(request, 'cart/cart_detail.html')
 
 
-# Contact
-
 def Contact_Page(request):
-    if request.method == "POST":
-        contact = Contact_us(
+    if request.method == 'POST':
+        Contact_us.objects.create(
             name=request.POST.get('name'),
             email=request.POST.get('email'),
             subject=request.POST.get('subject'),
             message=request.POST.get('message'),
         )
-        contact.save()
     return render(request, 'contact.html')
 
 
+@login_required(login_url='/accounts/login/')
 def checkout(request):
     if request.method == 'POST':
         address = request.POST.get('address')
         phone = request.POST.get('phone')
         pincode = request.POST.get('pincode')
-        cart = request.session.get('cart')
-        uid = request.session.get('_auth_user_id')
-        user = User.objects.get(pk=uid)
-        for i in cart:
-            a = (int(cart[i]['price']))
-            b = cart[i]['quantity']
-            total = a * b
-            order = Order(
-                user=user,
-                product=cart[i]['name'],
-                price=cart[i]['price'],
-                quantity=cart[i]['quantity'],
-                image=cart[i]['image'],
+        cart = request.session.get(settings.CART_SESSION_ID, {})
+        for item in cart.values():
+            total = item['price'] * item['quantity']
+            Order.objects.create(
+                user=request.user,
+                product=item['name'],
+                price=item['price'],
+                quantity=item['quantity'],
+                image=item.get('image', ''),
                 address=address,
                 phone=phone,
                 pincode=pincode,
                 total=total,
             )
-            order.save()
-        request.session['cart'] = {}
-        return redirect("home_page")
+        request.session[settings.CART_SESSION_ID] = {}
+        request.session.modified = True
+        return redirect('home_page')
 
     return render(request, 'checkout.html')
 
 
+@login_required(login_url='/accounts/login/')
 def Your_Order(request):
-    uid = request.session.get('_auth_user_id')
-    user = User.objects.get(pk=uid)
-
-    order = Order.objects.filter(user=user)
-    context = {
-        'order': order,
-    }
-    return render(request, 'order.html', context)
+    orders = Order.objects.filter(user=request.user)
+    return render(request, 'order.html', {'order': orders})
 
 
 def Product_page(request):
@@ -515,26 +587,15 @@ def Product_page(request):
         product = Product.objects.filter(brand=brandID).order_by('-id')
     else:
         product = Product.objects.all()
-    context = {
-        'brand': brand,
-        'category': category,
-        'product': product,
-    }
-    return render(request, 'product.html', context)
+    return render(request, 'product.html', {'brand': brand, 'category': category, 'product': product})
+
 
 def product_detail(request, id):
-    product = Product.objects.get(id=id)
-
-    context = {
-        'product': product,
-    }
-    return render(request, 'detail.html', context)
+    product = get_object_or_404(Product, id=id)
+    return render(request, 'detail.html', {'product': product})
 
 
 def Search(request):
-    query = request.GET['query']
+    query = request.GET.get('query', '')
     product = Product.objects.filter(name__icontains=query)
-    context = {
-        'product': product,
-    }
-    return render(request, 'search.html', context)
+    return render(request, 'search.html', {'product': product})

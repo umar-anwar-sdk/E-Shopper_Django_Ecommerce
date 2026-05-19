@@ -35,9 +35,9 @@ class Product(models.Model):
     Availability = (('In Stock', 'In Stock'), ('Out of Stock', 'Out of Stock'))
     Condition = (('New','New'), ('Used', 'Used'))
 
-    Category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, default=True)
-    sub_category = models.ForeignKey(Sub_Category, on_delete=models.CASCADE, null=True, default=True)
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, default=True)
+    Category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True)
+    sub_category = models.ForeignKey(Sub_Category, on_delete=models.CASCADE, null=True, blank=True)
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, blank=True)
     vendor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='products')
     image = models.ImageField(upload_to='images/', blank=True, null=True)
     name = models.CharField(max_length=100)
