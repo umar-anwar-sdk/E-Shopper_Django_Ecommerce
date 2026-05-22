@@ -255,6 +255,7 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
     """List products for everyone and allow admins/vendors to create products."""
     queryset = Product.objects.select_related('brand', 'Category', 'vendor').order_by('-id').all()
     serializer_class = ProductSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
@@ -299,6 +300,7 @@ class VendorProductListAPIView(generics.ListAPIView):
     """List products that belong to the current vendor."""
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsVendorUserRole]
+    pagination_class = None
 
     def get_queryset(self):
         return Product.objects.filter(vendor=self.request.user).select_related('brand', 'Category')
@@ -309,6 +311,7 @@ class AdminProductListAPIView(generics.ListAPIView):
     queryset = Product.objects.select_related('brand', 'Category', 'vendor').all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated, IsAdminUserRole]
+    pagination_class = None
 
 
 class VendorBrandUpdateAPIView(generics.UpdateAPIView):
@@ -333,6 +336,7 @@ class CategoryListCreateAPIView(generics.ListCreateAPIView):
     """List categories for everyone and allow admin to create categories."""
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
@@ -351,6 +355,7 @@ class BrandListCreateAPIView(generics.ListCreateAPIView):
     """List brands for everyone and allow admin to create brands."""
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
