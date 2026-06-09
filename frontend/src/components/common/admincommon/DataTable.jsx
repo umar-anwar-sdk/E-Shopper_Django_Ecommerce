@@ -101,7 +101,7 @@ const DataTable = ({
 
                     {onDelete && (
                       <button
-                        onClick={() => onDelete(item)}
+                        onClick={() => onDelete(item.id)}
                         className="text-2xl text-red-500 hover:text-red-700 cursor-pointer">
                         <RiDeleteBin5Line />
                       </button>

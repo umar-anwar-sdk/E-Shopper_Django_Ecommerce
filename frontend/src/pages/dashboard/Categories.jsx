@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import DataTable from "../../components/common/admincommon/DataTable";
 import { useNavigate } from "react-router-dom";
+import api from "../../services/api"; 
 
 const Categories = () => {
   const navigate = useNavigate();
@@ -21,22 +22,19 @@ const Categories = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // delete function
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this category?");
+    if (!confirmDelete) return;
 
-  const handleDelete = async (item) => {
-  if (!window.confirm("Are you sure you want to delete this category?")) return;
+    try {
+      await api.delete(`categories/${id}/`);
 
-  try {
-    await fetch(`https://umaranwar.pythonanywhere.com/api/categories/${item.id}/`, {
-      method: "DELETE",
-    });
+      setCategories((prev) => prev.filter((item) => item.id !== id));
 
-    setCategories((prev) => prev.filter((cat) => cat.id !== item.id));
-
-  } catch (error) {
-    console.error("Delete failed:", error);
-  }
-};
+    } catch (error) {
+      console.log("Delete error:", error.response?.data || error.message);
+    }
+  };
 // table columns
   const columns = [
     {

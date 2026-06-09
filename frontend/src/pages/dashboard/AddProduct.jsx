@@ -3,6 +3,7 @@ import axios from "axios";
 import DynamicForm from "../../components/common/admincommon/DynamicForm";
 
 const AddProduct = () => {
+  const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
 
@@ -24,7 +25,7 @@ const AddProduct = () => {
       setCategories(
         res.data.map((item) => ({
           label: item.name,
-          value: item.id,
+          value: item.name,
         }))
       );
     } catch (error) {
@@ -41,7 +42,7 @@ const AddProduct = () => {
       setBrands(
         res.data.map((item) => ({
           label: item.name,
-          value: item.id,
+          value: item.name,
         }))
       );
     } catch (error) {
@@ -61,17 +62,12 @@ const AddProduct = () => {
       type: "number",
     },
     {
-      name: "details",
-      label: "Product Details",
-      type: "text",
-    },
-    {
       name: "Availability",
       label: "Availability",
       type: "select",
       options: [
-        { label: "In Stock", value: "in_stock" },
-        { label: "Out of Stock", value: "out_of_stock" },
+        { label: "In Stock", value: "In Stock" },
+        { label: "Out of Stock", value: "Out of Stock" },
       ],
     },
     {
@@ -79,8 +75,8 @@ const AddProduct = () => {
       label: "Condition",
       type: "select",
       options: [
-        { label: "New", value: "new" },
-        { label: "Used", value: "used" },
+        { label: "New", value: "New" },
+        { label: "Used", value: "Used" },
       ],
     },
     {
@@ -100,6 +96,11 @@ const AddProduct = () => {
       label: "Product Image",
       type: "file",
     },
+    {
+      name: "details",
+      label: "Product Details",
+      type: "textarea",
+    }
   ];
 
   const handleProductSubmit = async (data) => {
@@ -112,16 +113,18 @@ const AddProduct = () => {
       formData.append("price", data.price);
       formData.append("details", data.details);
 
-      formData.append("Availability", data.Availability.value);
-      formData.append("Condition", data.Condition.value);
+      formData.append("Availability", data.Availability);
 
-      formData.append("category", data.category.value);
-      formData.append("brand", data.brand.value);
+      formData.append("Condition", data.Condition);
 
-      if (data.image && data.image[0]) {
-        formData.append("image", data.image[0]);
+      formData.append("category", (data.category));
+      console.log("Selected Category:", data.category);
+      formData.append("brand", (data.brand));
+      console.log("Selected Brand:", data.brand);
+
+      if (data.image) {
+        formData.append("image", data.image);
       }
-
       const response = await axios.post(
         "https://umaranwar.pythonanywhere.com/api/products/",
         formData,
@@ -139,6 +142,31 @@ const AddProduct = () => {
       alert("Failed to Add Product");
     }
   };
+  // delete method
+  const handleProductDelete = async (id) => {
+  const confirmDelete = window.confirm("Are you sure?");
+
+  if (!confirmDelete) return;
+
+  try {
+    const token = localStorage.getItem("accessToken");
+
+    await axios.delete(
+      `https://umaranwar.pythonanywhere.com/api/products/${id}/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    // UI update
+    setProducts((prev) => prev.filter((item) => item.id !== id));
+
+  } catch (error) {
+    console.log(error.response?.data);
+  }
+};
 
   return (
     <div className="container mx-auto p-5">
@@ -146,6 +174,7 @@ const AddProduct = () => {
         title="Add Product"
         fields={productFields}
         onSubmit={handleProductSubmit}
+        onDelete={handleProductDelete}
       />
     </div>
   );

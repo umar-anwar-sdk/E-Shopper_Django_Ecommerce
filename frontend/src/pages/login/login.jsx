@@ -42,6 +42,7 @@ const handleSubmit = async (e) => {
     setErrorMessage("Login failed");
     console.log(err);
   }finally {
+    console.log("Login attempt finished");
     setLoading(false);
   }
 };

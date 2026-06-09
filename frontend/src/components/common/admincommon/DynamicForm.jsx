@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(initialValues);
 
   // useEffect(() => {
@@ -12,19 +13,27 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
   }
 }, [initialValues]);
 
-  const handleChange = (e) => {
-    const { name, value, files } = e.target;
+    const handleChange = (e) => {
+      const { name, value, type, files } = e.target;
 
-    setFormData({
-      ...formData,
-      [name]: files ? files[0] : value,
-    });
-  };
+      setFormData({
+        ...formData,
+        [name]: type === "file" ? files[0] : value,
+      });
+    };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  setLoading(true);
+
+  try {
+    await onSubmit(formData);
+    setFormData({});
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
@@ -67,18 +76,22 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
                   <input
                     type={field.type}
                     name={field.name}
-                    value={formData[field.name] || ""}
                     onChange={handleChange}
                     className="w-full border-[#cdcdcd] border p-2 rounded focus:outline-none"
-                    required
+                    required={field.type !== "file"}
                   />
                 )}
               </div>
             ))}
           </div>
 
-          <button className="bg-[#1E293B] mt-5 cursor-pointer text-white py-2 px-4 rounded">
-            Save
+          <button
+            disabled={loading}
+            className={`mt-5 text-white py-2 px-4 rounded ${
+              loading ? "bg-gray-400 cursor-not-allowed" : "bg-[#1E293B]"
+            }`}
+          >
+            {loading ? "Saving..." : "Save"}
           </button>
         </form>
       </div>
