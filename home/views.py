@@ -316,7 +316,7 @@ class AdminProductListAPIView(generics.ListAPIView):
 
 class VendorBrandUpdateAPIView(generics.UpdateAPIView):
     """Allow a vendor to update branding and banner assets."""
-    permission_classes = [IsAuthenticated(), IsVendorUserRole]
+    permission_classes = [IsAuthenticated, IsVendorUserRole]
 
     def get_serializer_class(self):
         from authentication.serializers import UpdateProfileSerializer
@@ -345,14 +345,12 @@ class CategoryListCreateAPIView(generics.ListCreateAPIView):
 
 
 class CategoryRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """Allow admin users to manage a category."""
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
 
 
 class BrandListCreateAPIView(generics.ListCreateAPIView):
-    """List brands for everyone and allow admin to create brands."""
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     pagination_class = None
@@ -364,10 +362,9 @@ class BrandListCreateAPIView(generics.ListCreateAPIView):
 
 
 class BrandRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """Allow admin users to manage a brand."""
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
-    permission_classes = [IsAuthenticated(), IsAdminUserRole]
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
 
 
 class OrderListCreateAPIView(generics.ListCreateAPIView):
