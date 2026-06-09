@@ -8,11 +8,28 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
 
   if (token) {
-    config.headers.Authorization = `Token ${token}`; 
+    const isJwt = token.split('.').length === 3;
+    config.headers.Authorization = isJwt ? `Bearer ${token}` : `Token ${token}`;
   }
 
   return config;
 });
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    try {
+      const status = error.response?.status;
+      if (status === 401) {
+        localStorage.removeItem("accessToken");
+      
+        window.location.href = "/login";
+      }
+    } catch (e) {
+      // ignore
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;
 

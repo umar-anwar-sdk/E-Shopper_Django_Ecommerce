@@ -25,7 +25,7 @@ const AddProduct = () => {
       setCategories(
         res.data.map((item) => ({
           label: item.name,
-          value: item.name,
+          value: item.id,
         }))
       );
     } catch (error) {
@@ -42,7 +42,7 @@ const AddProduct = () => {
       setBrands(
         res.data.map((item) => ({
           label: item.name,
-          value: item.name,
+          value: item.id,
         }))
       );
     } catch (error) {
@@ -116,11 +116,10 @@ const AddProduct = () => {
       formData.append("Availability", data.Availability);
 
       formData.append("Condition", data.Condition);
-
-      formData.append("category", (data.category));
-      console.log("Selected Category:", data.category);
-      formData.append("brand", (data.brand));
-      console.log("Selected Brand:", data.brand);
+      formData.append("category_id", data.category);
+      console.log("Selected Category ID:", data.category);
+      formData.append("brand_id", data.brand);
+      console.log("Selected Brand ID:", data.brand);
 
       if (data.image) {
         formData.append("image", data.image);
