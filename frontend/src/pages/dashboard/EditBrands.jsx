@@ -3,7 +3,7 @@ import api from "../../services/api";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import DynamicForm from "../../components/common/admincommon/DynamicForm";
 
-const EditCategory = () => {
+const EditBrands = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
@@ -15,42 +15,38 @@ const EditCategory = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (location.state) {
+    if (location.state && location.state.name) {
       setInitialValues({ name: location.state.name });
     } else {
-      fetchCategory();
+      fetchBrand();
     }
-  }, []);
+  }, [id]);
 
-  const fetchCategory = async () => {
+  const fetchBrand = async () => {
     try {
-      const res = await api.get(`categories/${id}/`);
+      const res = await api.get(`brands/${id}/`);
       setInitialValues({ name: res.data.name });
     } catch (err) {
       console.log("Fetch error:", err);
     }
   };
 
-  // form fields
-  const categoryFields = [
+  const brandFields = [
     {
       name: "name",
-      label: "Category Name",
+      label: "Brand Name",
       type: "text",
       required: true,
     },
   ];
 
-  // update handler
   const handleUpdate = async (formData) => {
     setLoading(true);
-
     try {
-      await api.patch(`categories/${id}/`, formData);
+      await api.patch(`brands/${id}/`, formData);
 
-      alert("Category updated successfully ✅");
-      navigate("/admin/dashboard/categories");
-
+      alert("Brand updated successfully ✅");
+      navigate("/admin/dashboard/brands");
     } catch (error) {
       console.log("Update error:", error.response?.data || error.message);
     } finally {
@@ -61,14 +57,13 @@ const EditCategory = () => {
   return (
     <div className="container mx-auto p-5">
       <DynamicForm
-        title="Edit Category"
-        fields={categoryFields}
+        title="Edit Brand"
+        fields={brandFields}
         initialValues={initialValues}
         onSubmit={handleUpdate}
-        loading={loading}
       />
     </div>
   );
 };
 
-export default EditCategory;
+export default EditBrands;

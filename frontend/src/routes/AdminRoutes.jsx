@@ -11,6 +11,7 @@ import Categories from '../pages/dashboard/Categories';
 import Brands from '../pages/dashboard/Brands';
 import DashboardHome from '../pages/dashboard/DashboardHome';
 import EditCategory from '../pages/dashboard/EditCategory';
+import EditBrands from '../pages/dashboard/EditBrands';
 
 // Loading component
 const LoadingPage = () => (
@@ -42,6 +43,7 @@ const AdminRoutes = () => {
           <Route path="brands/add" element={<AddBrand />} />
           <Route path="categories/add" element={<AddCategory />} /> 
           <Route path="categories/edit/:id" element={<EditCategory />} />
+          <Route path="brands/edit/:id" element={<EditBrands />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/admin" replace />} />

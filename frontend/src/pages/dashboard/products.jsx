@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from "react";
 import DataTable from "../../components/common/admincommon/DataTable";
 import { useNavigate } from "react-router-dom";
-import api from "../../services/api"; // ✅ axios instance
+import api from "../../services/api"; 
 
 const Products = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ GET PRODUCTS
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -25,7 +24,6 @@ const Products = () => {
     }
   };
 
-  // ✅ DELETE PRODUCT (FIXED)
   const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
     if (!confirmDelete) return;
@@ -33,7 +31,6 @@ const Products = () => {
     try {
       await api.delete(`products/${id}/`);
 
-      // ✅ UI update
       setProducts((prev) => prev.filter((item) => item.id !== id));
 
     } catch (error) {
@@ -71,7 +68,7 @@ const Products = () => {
         data={products}
         loading={loading}
         onEdit={(item) => console.log("Edit:", item)}
-        onDelete={handleDelete} // ✅ fixed
+        onDelete={(item) => handleDelete(item.id)}
       />
     </div>
   );

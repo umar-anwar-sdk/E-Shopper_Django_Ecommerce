@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialValues);
+ const [formData, setFormData] = useState(initialValues);
 
   // useEffect(() => {
   //   setFormData(initialValues);
@@ -12,6 +12,7 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
     setFormData(initialValues);
   }
 }, [initialValues]);
+
 
     const handleChange = (e) => {
       const { name, value, type, files } = e.target;
@@ -76,6 +77,7 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
                   <input
                     type={field.type}
                     name={field.name}
+                    value={formData[field.name] || ""}  
                     onChange={handleChange}
                     className="w-full border-[#cdcdcd] border p-2 rounded focus:outline-none"
                     required={field.type !== "file"}
