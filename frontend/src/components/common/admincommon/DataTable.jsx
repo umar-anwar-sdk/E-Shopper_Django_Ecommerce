@@ -10,6 +10,8 @@ const DataTable = ({
   loading = false,
   onEdit,
   onDelete,
+  // optional: function(item) => ReactNode to render custom actions per row
+  rowActionsRender,
 }) => {
   return (
     <div className="container mx-auto px-4 my-10">
@@ -52,7 +54,7 @@ const DataTable = ({
             ))}
 
             {/* Action Column */}
-            {(onEdit || onDelete) && (
+            {(onEdit || onDelete || rowActionsRender) && (
               <th className="px-4 py-3 font-semibold text-gray-700">
                 Actions
               </th>
@@ -88,26 +90,30 @@ const DataTable = ({
                 ))}
 
                 {/* ACTION BUTTONS */}
-                {(onEdit || onDelete) && (
+                {(onEdit || onDelete || rowActionsRender) && (
                   <td className="px-4 py-3 flex items-center gap-2">
-                    
-                    {onEdit && (
-                      <button
-                        onClick={() => onEdit(item)}
-                        className="text-2xl text-blue-500 hover:text-blue-700 cursor-pointer">
-                        <HiOutlinePencilAlt />
-                      </button>
-                    )}
+                    {rowActionsRender ? (
+                      rowActionsRender(item)
+                    ) : (
+                      <>
+                        {onEdit && (
+                          <button
+                            onClick={() => onEdit(item)}
+                            className="text-2xl text-blue-500 hover:text-blue-700 cursor-pointer">
+                            <HiOutlinePencilAlt />
+                          </button>
+                        )}
 
-                    {onDelete && (
-                      <button
-                        onClick={() => onDelete(item)}
-                        className="text-2xl text-red-500 hover:text-red-700 cursor-pointer"
-                      >
-                        <RiDeleteBin5Line />
-                      </button>
+                        {onDelete && (
+                          <button
+                            onClick={() => onDelete(item)}
+                            className="text-2xl text-red-500 hover:text-red-700 cursor-pointer"
+                          >
+                            <RiDeleteBin5Line />
+                          </button>
+                        )}
+                      </>
                     )}
-
                   </td>
                 )}
               </tr>

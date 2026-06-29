@@ -2,39 +2,35 @@ import React, { useEffect, useState } from "react";
 
 const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
   const [loading, setLoading] = useState(false);
- const [formData, setFormData] = useState(initialValues);
+  const [formData, setFormData] = useState(initialValues);
 
-  // useEffect(() => {
-  //   setFormData(initialValues);
-  // }, [initialValues]);
   useEffect(() => {
-  if (initialValues && Object.keys(initialValues).length > 0) {
-    setFormData(initialValues);
-  }
-}, [initialValues]);
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      setFormData(initialValues);
+    }
+  }, [initialValues]);
 
+  const handleChange = (e) => {
+    const { name, value, type, files } = e.target;
 
-    const handleChange = (e) => {
-      const { name, value, type, files } = e.target;
-
-      setFormData({
-        ...formData,
-        [name]: type === "file" ? files[0] : value,
-      });
-    };
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "file" ? files[0] : value,
+    }));
+  };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    setLoading(true);
 
-  setLoading(true);
-
-  try {
-    await onSubmit(formData);
-    setFormData({});
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      await onSubmit(formData);
+      setFormData({});
+      e.target.reset(); // 👈 important for file input reset
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -49,7 +45,7 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
                   {field.label}
                 </label>
 
-                
+                {/* SELECT */}
                 {field.type === "select" ? (
                   <select
                     name={field.name}
@@ -64,23 +60,34 @@ const DynamicForm = ({ fields, onSubmit, title, initialValues = {} }) => {
                       </option>
                     ))}
                   </select>
+
+                /* TEXTAREA */
                 ) : field.type === "textarea" ? (
-                  
                   <textarea
                     name={field.name}
                     value={formData[field.name] || ""}
                     onChange={handleChange}
                     className="w-full border-[#cdcdcd] border p-2 rounded focus:outline-none"
                   />
+
+                /* FILE INPUT (FIXED) */
+                ) : field.type === "file" ? (
+                  <input
+                    type="file"
+                    name={field.name}
+                    onChange={handleChange}
+                    className="w-full border-[#cdcdcd] border p-2 rounded focus:outline-none"
+                  />
+
+                /* NORMAL INPUT */
                 ) : (
-                  
                   <input
                     type={field.type}
                     name={field.name}
-                    value={formData[field.name] || ""}  
+                    value={formData[field.name] || ""}
                     onChange={handleChange}
                     className="w-full border-[#cdcdcd] border p-2 rounded focus:outline-none"
-                    required={field.type !== "file"}
+                    required
                   />
                 )}
               </div>

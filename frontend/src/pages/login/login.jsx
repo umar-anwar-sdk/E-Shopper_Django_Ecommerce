@@ -11,7 +11,7 @@ const Login = () => {
       email: "",
       password: "",
     });
-    // loading and error state
+
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [debugResponse, setDebugResponse] = useState(null);
@@ -29,15 +29,29 @@ const handleSubmit = async (e) => {
   try {
     const res = await authService.login(formData);
 
-    console.log(res.data); 
+    console.log(res.data);
 
     const access = res.data.access || res.data.tokens?.access;
     const refresh = res.data.refresh || res.data.tokens?.refresh;
 
-    localStorage.setItem("accessToken", access);
-    localStorage.setItem("refreshToken", refresh);
-    console.log("Saved Token:", localStorage.getItem("accessToken"));
-    navigate("/admin/dashboard");
+    const userObj = res.data.user || res.data;
+    const rawRole = userObj?.role || (userObj?.is_staff ? 'admin' : userObj?.is_vendor ? 'vendor' : res.data.role) || 'admin';
+    const role = String(rawRole).toLowerCase();
+    const userId = userObj?.id || userObj?.user_id || res.data.user_id || null;
+
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refreshToken', refresh);
+    localStorage.setItem('role', role);
+    if (userId) localStorage.setItem('userId', String(userId));
+
+    console.log('Saved Token:', localStorage.getItem('accessToken'));
+    console.log('Saved Role:', localStorage.getItem('role'));
+
+    if (role === 'vendor') {
+      navigate('/vendor/dashboard');
+    } else {
+      navigate('/admin/dashboard');
+    }
   } catch (err) {
     setErrorMessage("Login failed");
     console.log(err);

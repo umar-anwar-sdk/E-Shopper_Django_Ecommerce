@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import WebsiteRoutes from './WebsiteRoutes';
 import AdminRoutes from './AdminRoutes';
+import VendorRoutes from './VendorRoutes';
+import AccessDenied from '../pages/AccessDenied';
 
 const LoadingPage = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -16,6 +18,8 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/*" element={<WebsiteRoutes />} />
       <Route path="/admin/*" element={<AdminRoutes />} />
+      <Route path="/access-denied" element={<AccessDenied />} />
+      <Route path="/vendor/*" element={<VendorRoutes />} />
     </Routes>
   );
 };

@@ -31,7 +31,6 @@ const EditCategory = () => {
     }
   };
 
-  // form fields
   const categoryFields = [
     {
       name: "name",
@@ -41,7 +40,6 @@ const EditCategory = () => {
     },
   ];
 
-  // update handler
   const handleUpdate = async (formData) => {
     setLoading(true);
 
